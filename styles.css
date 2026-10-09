@@ -1,0 +1,77 @@
+/* ---------- Hinweis neben dem Preis ---------- */
+.sf-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  font: 400 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: left;
+  white-space: nowrap;
+  background: #f2f4f7;
+  color: #475467;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sf-badge.sf-price { margin: 0 12px; vertical-align: middle; align-self: flex-start; }
+.sf-badge.sf-line  { display: flex; width: fit-content; margin: 6px 0; }
+.sf-badge .sf-head { font-weight: 400; }
+.sf-badge .sf-main { font-weight: 700; font-size: 14px; }
+.sf-badge .sf-sub  { font-size: 11px; opacity: .85; }
+
+.sf-ok      { background: #ecfdf3; color: #067647; }
+.sf-soon    { background: #fffaeb; color: #b54708; }
+.sf-bad     { background: #fef3f2; color: #b42318; }
+.sf-text    { background: #eff8ff; color: #175cd3; white-space: normal; max-width: 260px; }
+.sf-unknown { background: #f2f4f7; color: #475467; }
+.sf-loading { border-style: dashed; }
+
+/* ---------- Übersicht unten rechts ---------- */
+.sf-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  max-width: 380px;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1d2939;
+}
+.sf-panel-toggle {
+  display: block;
+  margin-left: auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 20px;
+  background: #003b95;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+}
+.sf-panel button:focus-visible, .sf-panel li:focus-visible { outline: 3px solid #febb02; outline-offset: 2px; }
+.sf-panel-body {
+  display: none;
+  margin-bottom: 8px;
+  padding: 10px;
+  max-height: 60vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+}
+.sf-panel.sf-open .sf-panel-body { display: block; }
+.sf-panel ul { list-style: none; margin: 0; padding: 0; }
+.sf-panel li { padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; border-left: 4px solid currentColor; cursor: pointer; }
+.sf-panel li strong { display: block; color: #1d2939; font-weight: 600; }
+.sf-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; color: #667085; font-size: 12px; }
+.sf-panel-foot button { border: 1px solid #d0d5dd; background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; cursor: pointer; }
+
+/* ---------- Drucken ---------- */
+@media print {
+  .sf-panel { display: none !important; }
+  .sf-badge { border-width: 2px; }
+}
