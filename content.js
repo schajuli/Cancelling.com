@@ -298,6 +298,11 @@
       copyShareHead: (ts) => `Unsere Unterkünfte – Stand ${ts}`,
       propertyLabel: 'Unterkunft',
       roomLabel: 'Zimmer',
+      progress: (a, b, n, r) => `Fristen ${a}/${n} · Zimmer & Links ${b}/${n} · ${r} Zimmer gefunden`,
+      loadingShort: (done, n) => `lädt ${done}/${n}`,
+      allLoaded: 'Alles geladen',
+      stillLoading: 'Wird geladen …',
+      incomplete: (b, n) => `(Hinweis: Zimmer & Links erst für ${b} von ${n} Buchungen geladen)`,
       searchLabel: 'Unterkunft (Suche)',
       bookingLabel: 'Buchung (privat – nicht weitergeben)',
       copied: 'Kopiert ✓',
@@ -327,6 +332,11 @@
       copyShareHead: (ts) => `Our places to stay – as of ${ts}`,
       propertyLabel: 'Property',
       roomLabel: 'Room',
+      progress: (a, b, n, r) => `Deadlines ${a}/${n} · Rooms & links ${b}/${n} · ${r} rooms found`,
+      loadingShort: (done, n) => `loading ${done}/${n}`,
+      allLoaded: 'Everything loaded',
+      stillLoading: 'Loading …',
+      incomplete: (b, n) => `(Note: rooms & links loaded for only ${b} of ${n} bookings)`,
       searchLabel: 'Property (search)',
       bookingLabel: 'Booking (private – do not share)',
       copied: 'Copied ✓',
@@ -556,12 +566,24 @@
         const d = await findDetails(e);
         e.publicUrl = d.url;
         e.room = d.room;
+        e.detailsDone = true;
         LOG(e.title, '→', d.url || '(kein Link)', '|', d.room || '(kein Zimmer)');
+        renderPanel(scanCounter);
         await sleep(400);
       }
     } finally {
       linksRunning = false;
     }
+  }
+
+  // ---------- Fortschritt ----------
+  function progress() {
+    const list = [...state.values()].filter((e) => e.lastSeen === scanCounter && e.card.isConnected);
+    const n = list.length;
+    const deadlines = list.filter((e) => e.info.status !== 'loading').length;
+    const details = list.filter((e) => e.detailsDone).length;
+    const rooms = list.filter((e) => e.room).length;
+    return { n, deadlines, details, rooms, busy: deadlines < n || details < n };
   }
 
   // ---------- Liste kopieren ----------
@@ -614,7 +636,10 @@
     const entries = [...state.values()]
       .filter((e) => e.lastSeen === scanCounter && e.card.isConnected)
       .sort((a, b) => (a.card.compareDocumentPosition(b.card) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-    const lines = [forSharing ? T.copyShareHead(ts) : T.copyHead(ts), ''];
+    const lines = [forSharing ? T.copyShareHead(ts) : T.copyHead(ts)];
+    const pr = progress();
+    if (pr.details < pr.n) lines.push(T.incomplete(pr.details, pr.n));
+    lines.push('');
     entries.forEach((e, i) => {
       const d = describe(e.info);
       lines.push(`${i + 1}. ${e.title}`);
@@ -656,7 +681,7 @@
     if (!p) {
       p = document.createElement('div');
       p.className = 'sf-panel';
-      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-copy-share"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
+      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><div class="sf-progress" role="status"><span class="sf-progress-text"></span><span class="sf-bar"><span></span></span></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-copy-share"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
       p.querySelector('.sf-panel-toggle').addEventListener('click', () => { panelOpen = !panelOpen; p.classList.toggle('sf-open', panelOpen); });
       p.querySelectorAll('.sf-lang button').forEach((b) => b.addEventListener('click', () => {
         chrome.storage.sync.set({ 'sf-settings': { ...settings, language: b.dataset.lang } });
@@ -683,7 +708,14 @@
     const rows = entries.map((e) => ({ e, d: describe(e.info) }))
       .sort((a, b) => a.d.rank - b.d.rank || (a.d.sortDate || 0) - (b.d.sortDate || 0));
     const urgent = rows.filter((r) => r.d.cls === 'sf-soon').length;
-    p.querySelector('.sf-panel-toggle').textContent = T.panel(entries.length) + (urgent ? ` · ${T.soon(urgent)}` : '');
+    const pr = progress();
+    const doneSteps = pr.deadlines + pr.details;
+    p.querySelector('.sf-panel-toggle').textContent = T.panel(entries.length)
+      + (pr.busy ? ` · ${T.loadingShort(Math.round(doneSteps / 2), pr.n)}` : '')
+      + (urgent ? ` · ${T.soon(urgent)}` : '');
+    p.classList.toggle('sf-busy', pr.busy);
+    p.querySelector('.sf-progress-text').textContent = `${pr.busy ? T.stillLoading : T.allLoaded} – ${T.progress(pr.deadlines, pr.details, pr.n, pr.rooms)}`;
+    p.querySelector('.sf-bar > span').style.width = `${pr.n ? Math.round((doneSteps / (2 * pr.n)) * 100) : 0}%`;
     p.querySelector('.sf-foot-text').textContent = T.foot;
     p.querySelectorAll('.sf-lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === currentLang)));
     const hb = p.querySelector('.sf-help');

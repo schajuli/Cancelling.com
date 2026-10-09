@@ -38,6 +38,20 @@
 .sf-unknown,
 .sf-loading         { color: #8a8a8a; font-style: italic; }
 
+/* ---------- Fortschritt ---------- */
+.sf-progress { margin: 2px 0 8px; font-size: 12px; color: #595959; }
+.sf-progress-text { display: block; margin-bottom: 4px; }
+.sf-bar { display: block; height: 4px; border-radius: 2px; background: #ececec; overflow: hidden; }
+.sf-bar > span { display: block; height: 100%; width: 0; background: #006ce4; transition: width .3s; }
+.sf-panel:not(.sf-busy) .sf-bar > span { background: #008234; }
+.sf-panel.sf-busy .sf-panel-toggle::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, .45); border-top-color: #fff; border-radius: 50%;
+  animation: sf-spin .9s linear infinite;
+}
+@keyframes sf-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sf-panel.sf-busy .sf-panel-toggle::before { animation: none; } .sf-bar > span { transition: none; } }
+
 /* ---------- Übersicht unten rechts ---------- */
 .sf-panel {
   position: fixed;

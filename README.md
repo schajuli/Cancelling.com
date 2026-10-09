@@ -66,6 +66,8 @@ Our places to stay – as of Fri, 09/10/2026, 16:39
 
 The booked room and the public property link are read from the booking's detail page in the background and cached for 30 days. If the room can't be found there (Booking sometimes builds that part only in the browser), it is picked up the next time you open the booking's detail page yourself. Until then, that line is simply left out. If it can't be found, a Booking.com search for the property's name and town is used instead (`Property (search): …`).
 
+While data is still loading in the background, the panel button shows a spinner and "loading 12/29", and the panel shows how many deadlines, rooms and links are ready. Lists copied before that include a note that they are incomplete.
+
 "X days left" refers to the time in the first line. The labels are also included when you print the page (Ctrl+P / ⌘+P); the panel is hidden when printing.
 
 ## Settings and help
