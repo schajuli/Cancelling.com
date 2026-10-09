@@ -97,7 +97,8 @@
         if (before && !d.hasTime) {
           d.date = new Date(new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate()) - 60000);
         }
-        return { status: 'date', ...d, source: m[0].trim() };
+        const tail = (t.slice(m.index + m[0].length).match(/^\p{L}*\.?/u) || [''])[0]; // Wort fertig lesen
+        return { status: 'date', ...d, source: (m[0] + tail).trim() };
       }
       return { status: 'text', label: m[0].trim().slice(0, 100) };
     }
@@ -174,7 +175,7 @@
     const t = document.body.innerText || '';
     for (const re of PHRASES) {
       const g = new RegExp(re.source, 'gi');
-      for (const m of t.matchAll(g)) set.add(m[0]);
+      for (const m of t.matchAll(g)) set.add(m[0] + (t.slice(m.index + m[0].length).match(/^\p{L}*\.?/u) || [''])[0]);
     }
     return set;
   }
@@ -290,6 +291,8 @@
       foot: 'Angaben laut Booking, ohne Gewähr',
       reload: 'Neu laden',
       help: 'Hilfe & Einstellungen',
+      overlap: (n) => `Überschneidet sich mit ${n} Buchung${n === 1 ? '' : 'en'}`,
+      overlapWith: (names) => `Überschneidung mit: ${names}`,
       copy: 'Liste kopieren',
       copied: 'Kopiert ✓',
       copyFail: 'Kopieren fehlgeschlagen',
@@ -311,6 +314,8 @@
       foot: 'Taken from Booking, no guarantee',
       reload: 'Reload',
       help: 'Help & settings',
+      overlap: (n) => `Overlaps with ${n} booking${n === 1 ? '' : 's'}`,
+      overlapWith: (names) => `Overlaps with: ${names}`,
       copy: 'Copy list',
       copied: 'Copied ✓',
       copyFail: 'Copy failed',
@@ -329,12 +334,22 @@
     T = I18N[lang] || I18N.en;
     currentLang = T === I18N.de ? 'de' : 'en';
   }
+  const DEFAULT_WARN_DAYS = 3;
+  const DEFAULT_WARN_COLOR = '#fff1b8';
+  const warnDays = () => {
+    const n = Number(settings.warnDays);
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_WARN_DAYS;
+  };
+  function applySettings() {
+    applyLanguage(settings.language);
+    document.documentElement.style.setProperty('--sf-warn', settings.warnColor || DEFAULT_WARN_COLOR);
+  }
   async function loadSettings() {
     try {
       const r = await chrome.storage.sync.get('sf-settings');
       settings = r['sf-settings'] || {};
-      applyLanguage(settings.language);
-    } catch { applyLanguage('auto'); }
+    } catch { settings = {}; }
+    applySettings();
   }
 
   // ---------- Anzeige ----------
@@ -354,7 +369,7 @@
         if (diff < 0) return { cls: 'sf-bad', head: T.expired, main: fmtDate(info), rank: 5 };
         const days = Math.floor(diff / DAY);
         const rest = days === 0 ? T.lastDay : T.daysLeft(days);
-        return { cls: days < 3 ? 'sf-soon' : 'sf-ok', head: T.until, main: fmtDate(info), sub: rest, rank: 1, sortDate: +info.date };
+        return { cls: days < warnDays() ? 'sf-soon' : 'sf-ok', head: T.until, main: fmtDate(info), sub: rest, rank: 1, sortDate: +info.date };
       }
       default: return { cls: 'sf-unknown', head: T.unknown, rank: 7 };
     }
@@ -377,7 +392,60 @@
       s.textContent = txt;
       e.badge.append(s);
     }
-    e.badge.title = e.info.source ? T.source(e.info.source) : '';
+    const tips = [];
+    if (e.overlaps && e.overlaps.length) {
+      const o = document.createElement('span');
+      o.className = 'sf-overlap';
+      const mark = document.createElement('b');
+      mark.textContent = '!';
+      mark.setAttribute('aria-hidden', 'true');
+      o.append(mark, document.createTextNode(T.overlap(e.overlaps.length)));
+      e.badge.prepend(o);
+      tips.push(T.overlapWith(e.overlaps.join(', ')));
+    }
+    if (e.info.source) tips.push(T.source(e.info.source));
+    e.badge.title = tips.join('\n');
+  }
+
+  // ---------- Überschneidungen ----------
+  const DM = '\\d{1,2}\\.?\\s*[A-Za-zÄÖÜäöü]{3,}\\.?(?:\\s*\\d{4})?';           // 18. Okt. / 18 Oct 2026
+  const MD = '[A-Za-zÄÖÜäöü]{3,}\\.?\\s*\\d{1,2}(?:,?\\s*\\d{4})?';             // Oct 18, 2026
+  const STAY_RE = new RegExp(`${DM}\\s*[–—-]\\s*${DM}|${MD}\\s*[–—-]\\s*(?:${MD}|\\d{1,2}(?:,?\\s*\\d{4})?)`);
+
+  // "18. Okt.–19. Okt." → { start, end } (Nächte: start ≤ Nacht < end)
+  function parseStay(text) {
+    if (!text) return null;
+    const [a, b] = text.split(/\s*[–—-]\s*/);
+    const pa = parseDate(a);
+    if (!pa) return null;
+    let pb = parseDate(b);
+    if (!pb && /^\d{1,2}/.test(b)) pb = parseDate(`${b.match(/^\d{1,2}/)[0]} ${a.replace(/[\d.,\s]/g, '')}`); // "Oct 18–19"
+    if (!pb) return null;
+    const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const start = day(pa.date);
+    let end = day(pb.date);
+    if (!/\d{4}/.test(text)) {
+      // ohne Jahresangabe: Jahreswechsel (28. Dez.–2. Jan.) berücksichtigen
+      while (end <= start) end = new Date(end.getFullYear() + 1, end.getMonth(), end.getDate());
+    }
+    if (end <= start) return null;
+    return { start, end };
+  }
+
+  function markOverlaps(scanId) {
+    const list = [...state.values()].filter((e) => e.lastSeen === scanId);
+    for (const e of list) { e.stay = parseStay(e.dates); e.overlaps = []; }
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (!a.stay || !b.stay) continue;
+        if (a.stay.start < b.stay.end && b.stay.start < a.stay.end) {
+          a.overlaps.push(b.title);
+          b.overlaps.push(a.title);
+        }
+      }
+    }
+    for (const e of list) render(e);
   }
 
   // ---------- Liste kopieren ----------
@@ -417,6 +485,7 @@
       const stay = stayLine(e);
       if (stay) lines.push(`   ${stay}`);
       lines.push(`   ${[d.head, d.main].filter(Boolean).join(' ')}${d.sub ? ` (${d.sub})` : ''}`);
+      if (e.overlaps && e.overlaps.length) lines.push(`   ! ${T.overlapWith(e.overlaps.join(', '))}`);
       const link = cardLink(e.card);
       if (link) lines.push(`   ${link}`);
       lines.push('');
@@ -491,6 +560,12 @@
       st.className = 'sf-li-status';
       st.textContent = [d.head, d.main, d.sub && `(${d.sub})`].filter(Boolean).join(' ');
       li.append(strong, st);
+      if (e.overlaps && e.overlaps.length) {
+        const ov = document.createElement('span');
+        ov.className = 'sf-li-overlap';
+        ov.textContent = '! ' + T.overlapWith(e.overlaps.join(', '));
+        li.append(ov);
+      }
       const go = () => e.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       li.addEventListener('click', go);
       li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
@@ -543,7 +618,12 @@
       count++;
       const h = card.querySelector('h1,h2,h3,h4,h5,h6,[data-testid*="title" i],[data-testid*="name" i]');
       const title = ((h && h.textContent) || marker.textContent).replace(/\s+/g, ' ').trim().slice(0, 70);
-      const dates = (card.textContent.match(/\d{1,2}\.\s*[A-Za-zÄÖÜäöü]{3,}\.?\s*[–-]\s*\d{1,2}\.\s*[A-Za-zÄÖÜäöü]{3,}\.?/) || [''])[0];
+      // Reisedaten aus der Zeile mit "Kostenlose Stornierung" (nicht aus der ganzen Karte, sonst klebt der Titel dran)
+      let dates = '';
+      for (let el = marker; el && el !== card.parentElement; el = el.parentElement) {
+        const m = (el.textContent || '').match(STAY_RE);
+        if (m) { dates = m[0]; break; }
+      }
       const key = (title + '|' + (dates || marker.textContent)).replace(/\s+/g, ' ').trim().slice(0, 180);
       let e = state.get(key);
       if (!e) {
@@ -560,6 +640,7 @@
       e.lastSeen = id;
       render(e);
     }
+    markOverlaps(id);
     // Anzeigen von Einträgen, die es so nicht mehr gibt, entfernen
     for (const e of state.values()) {
       if (e.lastSeen !== id && e.badge) { e.badge.remove(); e.badge = null; }
@@ -598,7 +679,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync' || !changes['sf-settings']) return;
     settings = changes['sf-settings'].newValue || {};
-    applyLanguage(settings.language);
+    applySettings();
     state.forEach(render);
     renderPanel(scanCounter);
   });

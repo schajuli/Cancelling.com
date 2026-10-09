@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <style>
-  body { margin: 0; padding: 14px 16px; width: 240px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
+  body { margin: 0; padding: 14px 16px; width: 290px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
   header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   header img { width: 24px; height: 24px; }
   h1 { margin: 0; font-size: 15px; }
@@ -30,6 +30,16 @@
     <label><input type="checkbox" name="hidePromos"> <span data-lang="de">Werbe-Fenster auf Buchungsseiten schließen</span><span data-lang="en">Close promo pop-ups on booking pages</span></label>
   </fieldset>
 
+    <fieldset>
+      <legend><span data-lang="de">Hervorhebung, wenn die Frist bald abläuft</span><span data-lang="en">Highlight when the deadline is close</span></legend>
+      <label><span data-lang="de">Weniger als</span><span data-lang="en">Less than</span>
+        <input type="number" name="warnDays" min="0" max="60" step="1" style="width:4.5em">
+        <span data-lang="de">Tage übrig</span><span data-lang="en">days left</span></label>
+      <label><span data-lang="de">Farbe</span><span data-lang="en">Colour</span>
+        <input type="color" name="warnColor">
+        <span class="warn-preview" style="padding:1px 8px;border:1px solid rgba(0,0,0,.14);border-radius:4px;font-size:12px">noch 2 Tage</span>
+        <button type="button" id="reset-warn" style="margin-left:auto;font:inherit;font-size:12px;background:none;border:0;text-decoration:underline;cursor:pointer;color:inherit"><span data-lang="de">Standard</span><span data-lang="en">Default</span></button></label>
+    </fieldset>
   <div class="foot">
     <a href="#" id="open-help"><span data-lang="de">Hilfe</span><span data-lang="en">Help</span></a>
     <span id="saved" role="status"></span>

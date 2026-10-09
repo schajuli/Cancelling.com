@@ -3,29 +3,38 @@
 
 .sf-badge {
   display: block;
-  margin: 6px 0 0;
-  padding: 0;
+  width: fit-content;
+  margin: 8px 0 0 auto;
+  padding: 6px 10px;
   font-family: inherit;
   font-size: 12px;
   line-height: 1.4;
   color: #595959;
   text-align: right;
   white-space: nowrap;
-  background: none;
-  border: 0;
+  background: #f5f5f5;
+  border: 1px solid #e7e7e7;
+  border-radius: 6px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-.sf-badge.sf-line { text-align: left; margin: 4px 0; }
+.sf-badge.sf-line { text-align: left; margin: 6px 0; }
 .sf-badge span { display: block; }
 .sf-badge .sf-main { font-size: 14px; font-weight: 700; color: #1a1a1a; }
 .sf-badge .sf-sub  { font-weight: 600; }
 
-/* Status nur über die Farbe der "noch X Tage"-Zeile bzw. der Überschrift */
+/* Status: grau = alles gut, gelb = Frist bald (einstellbar), rot = abgelaufen / nicht stornierbar */
 .sf-ok .sf-sub      { color: #008234; }
-.sf-soon .sf-sub    { color: #c45a00; }
-.sf-bad .sf-head    { color: #d4111e; font-weight: 600; }
-.sf-text            { white-space: normal; max-width: 260px; margin-left: auto; }
+.sf-badge.sf-soon   { background: var(--sf-warn, #fff1b8); border-color: rgba(0, 0, 0, .14); color: #3d3d3d; }
+.sf-soon .sf-sub    { color: #1a1a1a; }
+.sf-badge.sf-bad    { background: #fde8e7; border-color: #f4b7b3; }
+.sf-bad .sf-head    { color: #b0000e; font-weight: 600; }
+
+/* Überschneidung mit anderer Buchung */
+.sf-badge .sf-overlap { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-bottom: 4px; color: #b0000e; font-weight: 600; }
+.sf-badge.sf-line .sf-overlap { justify-content: flex-start; }
+.sf-overlap b { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #d4111e; color: #fff; font-size: 11px; line-height: 1; }
+.sf-text            { white-space: normal; max-width: 260px; }
 .sf-unknown,
 .sf-loading         { color: #8a8a8a; font-style: italic; }
 
@@ -44,15 +53,15 @@
   display: block;
   margin-left: auto;
   padding: 8px 14px;
-  border: 1px solid #c7c7c7;
+  border: 0;
   border-radius: 8px;
-  background: #fff;
-  color: #1a1a1a;
+  background: #006ce4;
+  color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 }
-.sf-panel-toggle:hover { border-color: #8a8a8a; }
-.sf-panel button:focus-visible, .sf-panel li:focus-visible, .sf-panel a:focus-visible { outline: 2px solid #22303f; outline-offset: 2px; }
+.sf-panel-toggle:hover { background: #0057b8; }
+.sf-panel button:focus-visible, .sf-panel li:focus-visible, .sf-panel a:focus-visible { outline: 2px solid #006ce4; outline-offset: 2px; }
 .sf-panel-body {
   display: none;
   margin-bottom: 8px;
@@ -70,19 +79,43 @@
 .sf-panel li:last-child { border-bottom: 0; }
 .sf-panel li strong { display: block; color: #1a1a1a; font-weight: 600; }
 .sf-panel li.sf-ok .sf-li-status   { color: #008234; }
-.sf-panel li.sf-soon .sf-li-status { color: #c45a00; }
+.sf-panel li.sf-soon .sf-li-status { color: #1a1a1a; background: var(--sf-warn, #fff1b8); padding: 0 4px; border-radius: 3px; }
+.sf-panel .sf-li-overlap { display: block; color: #b0000e; font-weight: 600; }
 .sf-panel li.sf-bad .sf-li-status  { color: #d4111e; }
 .sf-panel-head { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid #ececec; }
 .sf-panel-head strong { margin-right: auto; font-size: 14px; }
 .sf-lang { display: inline-flex; border: 1px solid #c7c7c7; border-radius: 6px; overflow: hidden; }
 .sf-lang button { padding: 2px 8px; border: 0; background: #fff; color: #595959; font-size: 12px; }
-.sf-lang button[aria-pressed="true"] { background: #22303f; color: #fff; font-weight: 600; }
-.sf-panel-head .sf-help { width: 24px; height: 24px; padding: 0; border: 1px solid #c7c7c7; border-radius: 50%; background: #fff; color: #22303f; font-weight: 700; line-height: 1; }
+.sf-lang button[aria-pressed="true"] { background: #006ce4; color: #fff; font-weight: 600; }
+.sf-panel .sf-panel-head .sf-help {
+  /* Booking hat eigene Button-Styles – deshalb hier alles fest vorgeben */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto;
+  box-sizing: border-box !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1.5px solid #006ce4 !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  color: #006ce4 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  vertical-align: middle;
+}
+.sf-panel .sf-panel-head .sf-help:hover { background: #006ce4 !important; color: #fff !important; }
 .sf-panel-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ececec; font-size: 12px; color: #6b6b6b; }
 .sf-foot-text { flex: 1 1 100%; }
 .sf-actions { display: flex; gap: 6px; width: 100%; }
 .sf-actions button { padding: 5px 10px; border: 1px solid #c7c7c7; border-radius: 6px; background: #fff; color: #1a1a1a; }
-.sf-actions .sf-copy { background: #22303f; border-color: #22303f; color: #fff; font-weight: 600; }
+.sf-actions .sf-copy { background: #006ce4; border-color: #006ce4; color: #fff; font-weight: 600; }
 
 @media print {
   .sf-panel { display: none !important; }

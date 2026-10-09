@@ -28,7 +28,11 @@
   .demo .card { padding: 12px 14px; text-align: right; font-size: 12px; line-height: 1.4; color: var(--muted); }
   .demo b { display: block; font-size: 14px; color: var(--ink); }
   .demo .s { display: block; font-weight: 600; }
-  .ok { color: var(--ok); } .soon { color: var(--soon); } .bad { color: var(--bad); font-weight: 600; } .unk { font-style: italic; color: #8a8a8a; }
+  .demo .card.grey { background: #f5f5f5; border-color: #e7e7e7; }
+  .ov { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-bottom: 4px; color: #b0000e; font-weight: 600; }
+  .ov i { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #d4111e; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; }
+  .note { padding: 12px 14px; background: #fde8e7; border: 1px solid #f4b7b3; border-radius: 8px; }
+  .ok { color: var(--ok); } .soon { color: var(--ink); } .bad { color: #b0000e; font-weight: 600; } .unk { font-style: italic; color: #8a8a8a; }
   pre { margin: 10px 0; padding: 12px 14px; overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.5; }
   code { font-size: 13px; }
   footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
@@ -57,6 +61,16 @@
         <span data-lang="de">Werbe-Fenster „Vergessen Sie nicht, Ihre Prämien zu nutzen“ automatisch schließen</span>
         <span data-lang="en">Automatically close the “Don’t forget to use your rewards” pop-up</span></label>
     </fieldset>
+    <fieldset>
+      <legend><span data-lang="de">Hervorhebung, wenn die Frist bald abläuft</span><span data-lang="en">Highlight when the deadline is close</span></legend>
+      <label><span data-lang="de">Weniger als</span><span data-lang="en">Less than</span>
+        <input type="number" name="warnDays" min="0" max="60" step="1" style="width:4.5em">
+        <span data-lang="de">Tage übrig</span><span data-lang="en">days left</span></label>
+      <label><span data-lang="de">Farbe</span><span data-lang="en">Colour</span>
+        <input type="color" name="warnColor">
+        <span class="warn-preview" style="padding:1px 8px;border:1px solid rgba(0,0,0,.14);border-radius:4px;font-size:12px">noch 2 Tage</span>
+        <button type="button" id="reset-warn" style="margin-left:auto;font:inherit;font-size:12px;background:none;border:0;text-decoration:underline;cursor:pointer;color:inherit"><span data-lang="de">Standard</span><span data-lang="en">Default</span></button></label>
+    </fieldset>
     <div id="saved" role="status"></div>
   </section>
 
@@ -72,12 +86,20 @@
 
     <h2>Was die Anzeige bedeutet</h2>
     <div class="demo">
-      <div class="card">Gratis stornierbar bis<b>Do., 15.10.2026</b><span class="s ok">noch 6 Tage</span></div>
-      <div class="card">Gratis stornierbar bis<b>Fr., 09.10.2026</b><span class="s soon">letzter Tag!</span></div>
-      <div class="card"><span class="bad">Gratis-Storno abgelaufen</span><b>Mo., 05.10.2026</b></div>
+      <div class="card grey">Gratis stornierbar bis<b>Do., 15.10.2026</b><span class="s ok">noch 6 Tage</span></div>
+      <div class="card warn-preview">Gratis stornierbar bis<b>Fr., 09.10.2026</b><span class="s soon">letzter Tag!</span></div>
+      <div class="card" style="background:#fde8e7;border-color:#f4b7b3"><span class="bad">Gratis-Storno abgelaufen</span><b>Mo., 05.10.2026</b></div>
       <div class="card unk">Stornofrist nicht gefunden</div>
+      <div class="card grey"><span class="ov"><i>!</i>Überschneidet sich mit 1 Buchung</span>Gratis stornierbar bis<b>Mo., 19.10.2026</b><span class="s ok">noch 10 Tage</span></div>
     </div>
-    <p>Grün: genug Zeit. Orange: weniger als 3 Tage. Rot: abgelaufen oder nicht erstattungsfähig. Booking schreibt „vor dem 16. Oktober“ – angezeigt wird deshalb der tatsächlich letzte Tag, der 15. Oktober. Fahr mit der Maus über die Anzeige, um Bookings Originaltext zu sehen.</p>
+    <p>Grau: genug Zeit. Gelb: weniger als 3 Tage übrig (Anzahl der Tage und Farbe oben einstellbar). Rot: abgelaufen oder nicht erstattungsfähig. Rotes <b style="color:#b0000e">!</b>: Die Buchung überschneidet sich mit einer anderen (siehe unten). Fahr mit der Maus über die Anzeige, um Bookings Originaltext zu sehen.</p>
+
+    <h2>Uhrzeit der Frist: lieber einen Tag zu früh</h2>
+    <p>In der Übersicht nennt Booking nur einen Tag, z. B. „vor dem Sa., 31. Oktober“. Angezeigt wird deshalb der Tag davor, also der 30. Oktober. Oft gilt die Frist tatsächlich bis zu einer bestimmten Uhrzeit am genannten Tag – auf der Detailseite steht dann etwa „bis 31. Oktober 2026 18:00“. Die Erweiterung ist also bewusst auf der sicheren Seite und zeigt die Frist manchmal einen Tag früher als nötig. Die genaue Uhrzeit steht in den Stornierungsbedingungen der Buchung.</p>
+
+    <h2>Warnung: Überschneidende Buchungen</h2>
+    <p class="note"><b>Achtung:</b> Wenn du für dieselbe Nacht mehrere Unterkünfte gebucht hast, zahlst du am Ende für alle – es sei denn, du stornierst die überzähligen rechtzeitig. Prüf bei jedem roten <b>!</b>, welche Buchung du behalten willst, und storniere die anderen vor Ablauf ihrer Frist.</p>
+    <p>Buchungen, deren Nächte sich überschneiden, bekommen ein rotes <b style="color:#b0000e">!</b> mit dem Hinweis „Überschneidet sich mit …“. Beispiele: zwei Buchungen für die Nacht vom 19. auf den 20., oder 1.–4. und 3.–5. Ein Wechsel am selben Tag (1.–4. und 4.–6.) gilt nicht als Überschneidung. Die Namen der anderen Buchungen stehen im Tooltip, im Panel und in der kopierten Liste.</p>
 
     <h2>Liste kopieren</h2>
     <p>Im Panel unten rechts kopiert <b>Liste kopieren</b> alle Buchungen als Text, z. B. für WhatsApp oder eine Notiz:</p>
@@ -118,12 +140,20 @@
 
     <h2>What the labels mean</h2>
     <div class="demo">
-      <div class="card">Free cancellation until<b>Thu, 15/10/2026</b><span class="s ok">6 days left</span></div>
-      <div class="card">Free cancellation until<b>Fri, 09/10/2026</b><span class="s soon">last day!</span></div>
-      <div class="card"><span class="bad">Free cancellation expired</span><b>Mon, 05/10/2026</b></div>
+      <div class="card grey">Free cancellation until<b>Thu, 15/10/2026</b><span class="s ok">6 days left</span></div>
+      <div class="card warn-preview">Free cancellation until<b>Fri, 09/10/2026</b><span class="s soon">last day!</span></div>
+      <div class="card" style="background:#fde8e7;border-color:#f4b7b3"><span class="bad">Free cancellation expired</span><b>Mon, 05/10/2026</b></div>
       <div class="card unk">Deadline not found</div>
+      <div class="card grey"><span class="ov"><i>!</i>Overlaps with 1 booking</span>Free cancellation until<b>Mon, 19/10/2026</b><span class="s ok">10 days left</span></div>
     </div>
-    <p>Green: plenty of time. Orange: less than 3 days. Red: expired or non-refundable. Booking says “before 16 October”, so the extension shows the actual last day, 15 October. Hover over a label to see Booking’s original wording.</p>
+    <p>Grey: plenty of time. Yellow: less than 3 days left (number of days and colour can be changed above). Red: expired or non-refundable. Red <b style="color:#b0000e">!</b>: the booking overlaps with another one (see below). Hover over a label to see Booking’s original wording.</p>
+
+    <h2>Deadline time: better a day early</h2>
+    <p>In the reservation list Booking only gives a day, e.g. “before Sat, 31 October”, so the extension shows the day before, 30 October. Often the deadline actually runs until a specific time on that day – the detail page then says something like “until 31 October 2026 18:00”. The extension deliberately stays on the safe side and may show the deadline one day earlier than necessary. The exact time is in your booking’s cancellation policy.</p>
+
+    <h2>Warning: overlapping bookings</h2>
+    <p class="note"><b>Heads-up:</b> If you have booked several places for the same night, you will end up paying for all of them – unless you cancel the extra ones in time. For every red <b>!</b>, decide which booking to keep and cancel the others before their deadline.</p>
+    <p>Bookings whose nights overlap get a red <b style="color:#b0000e">!</b> saying “Overlaps with …”. Examples: two bookings for the night of the 19th to the 20th, or 1–4 and 3–5. Checking out and in on the same day (1–4 and 4–6) does not count as an overlap. The names of the other bookings are shown in the tooltip, the panel and the copied list.</p>
 
     <h2>Copy list</h2>
     <p>In the bottom-right panel, <b>Copy list</b> copies all bookings as plain text, e.g. for a chat or a note:</p>
