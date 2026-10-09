@@ -9,7 +9,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Seiten, auf denen das Plugin aktiv wird
-  const PAGE_RE = /mytrips|myreservations|trips|reservations|bookings|mybooking/i;
+  const PAGE_RE = /^\/mytrips/i; // nur die Buchungsübersicht
   // Kennzeichnung in der Buchungskarte ("· Kostenlose Stornierung")
   const MARKER_RE = /kostenlose\s+stornierung|free\s+cancell?ation|nicht\s+erstattungsf(?:ä|ae)hig|non-?refundable|teilweise\s+erstattungsf|partially\s+refundable/i;
   const NONREF_RE = /nicht\s+erstattungsf(?:ä|ae)hig|non-?refundable|keine\s+kostenlose\s+stornierung|no\s+free\s+cancell?ation/i;
@@ -289,6 +289,7 @@
       soon: (n) => `${n} bald fällig`,
       foot: 'Angaben laut Booking, ohne Gewähr',
       reload: 'Neu laden',
+      help: 'Hilfe & Einstellungen',
       copy: 'Liste kopieren',
       copied: 'Kopiert ✓',
       copyFail: 'Kopieren fehlgeschlagen',
@@ -309,6 +310,7 @@
       soon: (n) => `${n} due soon`,
       foot: 'Taken from Booking, no guarantee',
       reload: 'Reload',
+      help: 'Help & settings',
       copy: 'Copy list',
       copied: 'Copied ✓',
       copyFail: 'Copy failed',
@@ -317,17 +319,21 @@
     },
   };
   let T = I18N.de;
+  let currentLang = 'de';
+  let settings = {};
   function applyLanguage(setting) {
     let lang = setting;
     if (!lang || lang === 'auto') {
       lang = (document.documentElement.lang || navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
     }
     T = I18N[lang] || I18N.en;
+    currentLang = T === I18N.de ? 'de' : 'en';
   }
   async function loadSettings() {
     try {
       const r = await chrome.storage.sync.get('sf-settings');
-      applyLanguage((r['sf-settings'] || {}).language);
+      settings = r['sf-settings'] || {};
+      applyLanguage(settings.language);
     } catch { applyLanguage('auto'); }
   }
 
@@ -440,8 +446,12 @@
     if (!p) {
       p = document.createElement('div');
       p.className = 'sf-panel';
-      p.innerHTML = '<div class="sf-panel-body"><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
+      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
       p.querySelector('.sf-panel-toggle').addEventListener('click', () => { panelOpen = !panelOpen; p.classList.toggle('sf-open', panelOpen); });
+      p.querySelectorAll('.sf-lang button').forEach((b) => b.addEventListener('click', () => {
+        chrome.storage.sync.set({ 'sf-settings': { ...settings, language: b.dataset.lang } });
+      }));
+      p.querySelector('.sf-help').addEventListener('click', () => { chrome.runtime.sendMessage({ type: 'sf-open-help' }).catch(() => {}); });
       p.querySelector('.sf-copy').addEventListener('click', async (ev) => {
         const btn = ev.currentTarget;
         const ok = await copyText(buildCopyText());
@@ -462,6 +472,10 @@
     const urgent = rows.filter((r) => r.d.cls === 'sf-soon').length;
     p.querySelector('.sf-panel-toggle').textContent = T.panel(entries.length) + (urgent ? ` · ${T.soon(urgent)}` : '');
     p.querySelector('.sf-foot-text').textContent = T.foot;
+    p.querySelectorAll('.sf-lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === currentLang)));
+    const hb = p.querySelector('.sf-help');
+    hb.title = T.help;
+    hb.setAttribute('aria-label', T.help);
     p.querySelector('.sf-reload').textContent = T.reload;
     const cb = p.querySelector('.sf-copy');
     if (cb.textContent !== T.copied && cb.textContent !== T.copyFail) cb.textContent = T.copy;
@@ -473,7 +487,10 @@
       li.tabIndex = 0;
       const strong = document.createElement('strong');
       strong.textContent = e.title;
-      li.append(strong, document.createTextNode([d.head, d.main, d.sub && `(${d.sub})`].filter(Boolean).join(' ')));
+      const st = document.createElement('span');
+      st.className = 'sf-li-status';
+      st.textContent = [d.head, d.main, d.sub && `(${d.sub})`].filter(Boolean).join(' ');
+      li.append(strong, st);
       const go = () => e.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       li.addEventListener('click', go);
       li.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
@@ -514,7 +531,7 @@
 
   function scan() {
     const id = ++scanCounter;
-    if (!PAGE_RE.test(location.pathname + location.search)) { renderPanel(id); return; }
+    if (!PAGE_RE.test(location.pathname)) { renderPanel(id); return; }
     const markers = findMarkers();
     const usedAnchors = new Set();
     let count = 0;
@@ -580,7 +597,8 @@
   // Sprache umgestellt (über das Extension-Symbol) → sofort neu anzeigen
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync' || !changes['sf-settings']) return;
-    applyLanguage((changes['sf-settings'].newValue || {}).language);
+    settings = changes['sf-settings'].newValue || {};
+    applyLanguage(settings.language);
     state.forEach(render);
     renderPanel(scanCounter);
   });

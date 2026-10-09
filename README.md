@@ -16,17 +16,32 @@ A button in the bottom-right corner opens a list of all bookings sorted by deadl
 ```
 My bookings – copied on Fri, 09/10/2026, 16:39
 
-1. Refúgio da Suite 5
-   19 Oct–20 Oct · Pinhão
-   Free cancellation until Thu, 15/10/2026 (6 days left)
+1. Seaside Loft Alfama
+   16 Oct–18 Oct · Lisbon
+   Free cancellation until Sat, 10/10/2026 (last day!)
+   https://secure.booking.com/...
+
+2. Canal House Jordaan
+   23 Oct–26 Oct · Amsterdam
+   Free cancellation until Wed, 21/10/2026 (12 days left)
+   https://secure.booking.com/...
+
+3. Terrazza Trastevere
+   2 Nov–5 Nov · Rome
+   Free cancellation expired Mon, 05/10/2026
    https://secure.booking.com/...
 ```
 
 The labels are included when you print the page (Ctrl+P).
 
-## Settings
+## Settings and help
 
-Click the Cancelling icon in the browser toolbar to choose the language: automatic (matches the Booking.com page), German or English. The change applies immediately.
+Click the Cancelling icon in the browser toolbar (behind the puzzle icon if it isn't pinned), use the DE / EN switch in the panel, or open the built-in help page via the "?" in the panel. Available settings:
+
+- **Language**: automatic (matches the Booking.com page), German or English.
+- **Close promo pop-ups**: on booking confirmation pages, automatically closes the "Don't forget to use your rewards" pop-up (airport transfer, car rental, activities…). Only that pop-up is touched; all other dialogs are left alone. On by default.
+
+The extension only runs on the reservation list (`secure.booking.com/mytrips…`). The pop-up closer only runs on booking confirmation pages.
 
 ## How it works
 

@@ -3,24 +3,37 @@
 <head>
 <meta charset="utf-8">
 <style>
-  body { margin: 0; padding: 14px 16px; width: 220px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1d2939; }
-  h1 { margin: 0 0 10px; font-size: 15px; }
-  fieldset { margin: 0; padding: 0; border: 0; }
-  legend { padding: 0; margin-bottom: 6px; color: #667085; }
-  label { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
-  input:focus-visible { outline: 2px solid #003b95; outline-offset: 2px; }
-  .saved { min-height: 1.4em; margin-top: 8px; color: #067647; font-size: 12px; }
+  body { margin: 0; padding: 14px 16px; width: 240px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
+  header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  header img { width: 24px; height: 24px; }
+  h1 { margin: 0; font-size: 15px; }
+  fieldset { margin: 0 0 12px; padding: 0; border: 0; }
+  legend { padding: 0; margin-bottom: 4px; color: #595959; }
+  label { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+  input:focus-visible, a:focus-visible { outline: 2px solid #1a1a1a; outline-offset: 2px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #e6e6e6; }
+  a { color: #1a1a1a; }
+  #saved { color: #007a33; font-size: 12px; }
 </style>
 </head>
 <body>
-  <h1>Cancelling</h1>
+  <header><img src="icons/icon48.png" alt=""><h1>Cancelling</h1></header>
+
   <fieldset>
-    <legend id="legend">Sprache / Language</legend>
-    <label><input type="radio" name="language" value="auto"> <span id="auto">Automatisch</span></label>
+    <legend><span data-lang="de">Sprache</span><span data-lang="en">Language</span></legend>
+    <label><input type="radio" name="language" value="auto"> <span data-lang="de">Automatisch (wie Booking)</span><span data-lang="en">Automatic (match Booking)</span></label>
     <label><input type="radio" name="language" value="de"> Deutsch</label>
     <label><input type="radio" name="language" value="en"> English</label>
   </fieldset>
-  <div class="saved" id="saved" role="status"></div>
-  <script src="popup.js"></script>
+
+  <fieldset>
+    <label><input type="checkbox" name="hidePromos"> <span data-lang="de">Werbe-Fenster auf Buchungsseiten schließen</span><span data-lang="en">Close promo pop-ups on booking pages</span></label>
+  </fieldset>
+
+  <div class="foot">
+    <a href="#" id="open-help"><span data-lang="de">Hilfe</span><span data-lang="en">Help</span></a>
+    <span id="saved" role="status"></span>
+  </div>
+  <script src="settings.js"></script>
 </body>
 </html>
