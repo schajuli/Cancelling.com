@@ -298,6 +298,8 @@
       copyShareHead: (ts) => `Unsere Unterkünfte – Stand ${ts}`,
       propertyLabel: 'Unterkunft',
       roomLabel: 'Zimmer',
+      priceLabel: 'Preis',
+      total: (sum, n) => `Gesamt: ${sum} (${n} Buchung${n === 1 ? '' : 'en'})`,
       progress: (a, b, n, r) => `Fristen ${a}/${n} · Zimmer & Links ${b}/${n} · ${r} Zimmer gefunden`,
       loadingShort: (done, n) => `lädt ${done}/${n}`,
       allLoaded: 'Alles geladen',
@@ -332,6 +334,8 @@
       copyShareHead: (ts) => `Our places to stay – as of ${ts}`,
       propertyLabel: 'Property',
       roomLabel: 'Room',
+      priceLabel: 'Price',
+      total: (sum, n) => `Total: ${sum} (${n} booking${n === 1 ? '' : 's'})`,
       progress: (a, b, n, r) => `Deadlines ${a}/${n} · Rooms & links ${b}/${n} · ${r} rooms found`,
       loadingShort: (done, n) => `loading ${done}/${n}`,
       allLoaded: 'Everything loaded',
@@ -586,6 +590,32 @@
     return { n, deadlines, details, rooms, busy: deadlines < n || details < n };
   }
 
+  // "€ 1.234,56" / "US$1,234.56" → { amount, currency }
+  const CURRENCIES = { '€': 'EUR', eur: 'EUR', 'us$': 'USD', $: 'USD', '£': 'GBP', chf: 'CHF' };
+  function parsePrice(text) {
+    if (!text) return null;
+    const cur = (text.match(/€|eur|chf|us\$|\$|£/i) || [''])[0].toLowerCase();
+    let num = text.replace(/[^\d.,]/g, '');
+    if (!cur || !num) return null;
+    const lastSep = Math.max(num.lastIndexOf(','), num.lastIndexOf('.'));
+    if (lastSep >= 0 && num.length - lastSep - 1 === 2) {
+      num = num.slice(0, lastSep).replace(/[.,]/g, '') + '.' + num.slice(lastSep + 1);
+    } else {
+      num = num.replace(/[.,]/g, '');
+    }
+    const amount = parseFloat(num);
+    return Number.isFinite(amount) ? { amount, currency: CURRENCIES[cur] } : null;
+  }
+
+  function totalLine(entries) {
+    const prices = entries.map((e) => parsePrice(e.price)).filter(Boolean);
+    if (!prices.length || prices.length !== entries.length) return '';
+    const currency = prices[0].currency;
+    if (prices.some((x) => x.currency !== currency)) return '';
+    const sum = prices.reduce((a, x) => a + x.amount, 0);
+    return T.total(new Intl.NumberFormat(T.locale, { style: 'currency', currency }).format(sum), prices.length);
+  }
+
   // ---------- Liste kopieren ----------
   function stayLine(e) {
     // Zeile "18. Okt.–19. Okt. · Vila Nova de Gaia · Kostenlose Stornierung" ohne den Storno-Teil.
@@ -646,6 +676,7 @@
       const stay = stayLine(e);
       if (stay) lines.push(`   ${stay}`);
       if (e.room) lines.push(`   ${T.roomLabel}: ${e.room}`);
+      if (e.price) lines.push(`   ${T.priceLabel}: ${e.price}`);
       lines.push(`   ${[d.head, d.main].filter(Boolean).join(' ')}${d.sub ? ` (${d.sub})` : ''}`);
       if (e.overlaps && e.overlaps.length) lines.push(`   ! ${T.overlapWith(e.overlaps.join(', '))}`);
       if (e.publicUrl) lines.push(`   ${T.propertyLabel}: ${e.publicUrl}`);
@@ -656,6 +687,8 @@
       }
       lines.push('');
     });
+    const total = totalLine(entries);
+    if (total) lines.push(total);
     return lines.join('\n').trim() + '\n';
   }
 
@@ -816,6 +849,7 @@
       e.marker = marker;
       e.title = title;
       e.dates = dates;
+      if (anchor !== marker) e.price = anchor.textContent.replace(/\s+/g, ' ').trim();
       e.lastSeen = id;
       render(e);
     }

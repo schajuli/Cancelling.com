@@ -27,6 +27,7 @@ My bookings – copied on Fri, 09/10/2026, 16:39
 1. Seaside Loft Alfama
    16 Oct–18 Oct · Lisbon
    Room: Studio with River View
+   Price: € 245
    Free cancellation until Sat, 10/10/2026 (last day!)
    Property: https://www.booking.com/hotel/pt/seaside-loft-alfama.html
    Booking (private – do not share): https://secure.booking.com/...
@@ -60,11 +61,14 @@ Our places to stay – as of Fri, 09/10/2026, 16:39
 1. Seaside Loft Alfama
    16 Oct–18 Oct · Lisbon
    Room: Studio with River View
+   Price: € 245
    Free cancellation until Sat, 10/10/2026 (last day!)
    Property: https://www.booking.com/hotel/pt/seaside-loft-alfama.html
 ```
 
 The booked room and the public property link are read from the booking's detail page in the background and cached for 30 days. If the room can't be found there (Booking sometimes builds that part only in the browser), it is picked up the next time you open the booking's detail page yourself. Until then, that line is simply left out. If it can't be found, a Booking.com search for the property's name and town is used instead (`Property (search): …`).
+
+Both lists also include each booking's price as shown in the reservation list, plus a total at the end (if all prices are in the same currency). The total includes every booking in the list, overlapping ones too.
 
 While data is still loading in the background, the panel button shows a spinner and "loading 12/29", and the panel shows how many deadlines, rooms and links are ready. Lists copied before that include a note that they are incomplete.
 
