@@ -19,33 +19,52 @@ Overlaps are checked per night: 1–4 and 3–5 overlap, 1–4 and 4–6 (check-
 
 ## Panel and copy list
 
-The blue **Cancelling · X bookings** button in the bottom-right corner opens a list of all bookings sorted by deadline. The panel also has a **DE / EN** language switch, a **?** that opens the help page, **Reload** to look up all deadlines again, and **Copy list**, which puts all bookings on your clipboard as plain text, ready to paste into a chat or note:
+The blue **Cancelling · X bookings** button in the bottom-right corner opens a list of all bookings sorted by deadline. The panel also has a **DE / EN** language switch, a **?** that opens the help page, **Reload** to look up all deadlines again, and two copy buttons. **Copy list** puts all bookings on your clipboard as plain text, ready to paste into a chat or note:
 
 ```
 My bookings – copied on Fri, 09/10/2026, 16:39
 
 1. Seaside Loft Alfama
    16 Oct–18 Oct · Lisbon
+   Room: Studio with River View
    Free cancellation until Sat, 10/10/2026 (last day!)
-   https://secure.booking.com/...
+   Property: https://www.booking.com/hotel/pt/seaside-loft-alfama.html
+   Booking (private – do not share): https://secure.booking.com/...
 
 2. Canal House Jordaan
    23 Oct–26 Oct · Amsterdam
    Free cancellation until Wed, 21/10/2026 (12 days left)
-   https://secure.booking.com/...
+   Property: https://www.booking.com/hotel/nl/canal-house-jordaan.html
+   Booking (private – do not share): https://secure.booking.com/...
 
 3. Terrazza Trastevere
    2 Nov–5 Nov · Rome
    Free cancellation until Fri, 30/10/2026 (21 days left)
    ! Overlaps with: Casa Monti
-   https://secure.booking.com/...
+   Property: https://www.booking.com/hotel/it/terrazza-trastevere.html
+   Booking (private – do not share): https://secure.booking.com/...
 
 4. Casa Monti
    4 Nov–6 Nov · Rome
    Free cancellation expired Mon, 05/10/2026
    ! Overlaps with: Terrazza Trastevere
-   https://secure.booking.com/...
+   Property: https://www.booking.com/hotel/it/casa-monti.html
+   Booking (private – do not share): https://secure.booking.com/...
 ```
+
+**Copy for sharing** is meant for friends or travel companions: exactly the same list, including deadlines and overlap warnings, but without your private booking links. Those contain a personal access key (`auth_key`) and should not be shared. Tracking parameters (`label`, `sid`, `gclid`, `aid` …) are removed from all copied links.
+
+```
+Our places to stay – as of Fri, 09/10/2026, 16:39
+
+1. Seaside Loft Alfama
+   16 Oct–18 Oct · Lisbon
+   Room: Studio with River View
+   Free cancellation until Sat, 10/10/2026 (last day!)
+   Property: https://www.booking.com/hotel/pt/seaside-loft-alfama.html
+```
+
+The booked room and the public property link are read from the booking's detail page in the background and cached for 30 days. If the room can't be found there (Booking sometimes builds that part only in the browser), it is picked up the next time you open the booking's detail page yourself. Until then, that line is simply left out. If it can't be found, a Booking.com search for the property's name and town is used instead (`Property (search): …`).
 
 "X days left" refers to the time in the first line. The labels are also included when you print the page (Ctrl+P / ⌘+P); the panel is hidden when printing.
 
@@ -108,7 +127,8 @@ Run `git pull` in the folder, then click the reload icon next to Cancelling in `
 | File | Purpose |
 | ---- | ------- |
 | `content.js`, `styles.css` | Labels and panel on the reservation list |
-| `quiet.js` | Closes the promo pop-up on confirmation pages |
+| `room.js` | Reads the booked room ("Your room information") |
+| `quiet.js` | On confirmation pages: remembers the booked room, closes the promo pop-up |
 | `help.html`, `popup.html`, `settings.js` | Help page, toolbar menu and shared settings |
 | `background.js` | Loads detail pages, opens the help page |
 | `icons/` | Extension icons |

@@ -294,6 +294,12 @@
       overlap: (n) => `Überschneidet sich mit ${n} Buchung${n === 1 ? '' : 'en'}`,
       overlapWith: (names) => `Überschneidung mit: ${names}`,
       copy: 'Liste kopieren',
+      copyShare: 'Zum Teilen kopieren',
+      copyShareHead: (ts) => `Unsere Unterkünfte – Stand ${ts}`,
+      propertyLabel: 'Unterkunft',
+      roomLabel: 'Zimmer',
+      searchLabel: 'Unterkunft (Suche)',
+      bookingLabel: 'Buchung (privat – nicht weitergeben)',
       copied: 'Kopiert ✓',
       copyFail: 'Kopieren fehlgeschlagen',
       copyHead: (ts) => `Meine Buchungen – kopiert am ${ts}`,
@@ -317,6 +323,12 @@
       overlap: (n) => `Overlaps with ${n} booking${n === 1 ? '' : 's'}`,
       overlapWith: (names) => `Overlaps with: ${names}`,
       copy: 'Copy list',
+      copyShare: 'Copy for sharing',
+      copyShareHead: (ts) => `Our places to stay – as of ${ts}`,
+      propertyLabel: 'Property',
+      roomLabel: 'Room',
+      searchLabel: 'Property (search)',
+      bookingLabel: 'Booking (private – do not share)',
       copied: 'Copied ✓',
       copyFail: 'Copy failed',
       copyHead: (ts) => `My bookings – copied on ${ts}`,
@@ -448,46 +460,175 @@
     for (const e of list) render(e);
   }
 
+  // ---------- Öffentlicher Link zur Unterkunft ----------
+  // Die Buchungslinks gehen nur mit Login. Für Dritte brauchen wir die normale Hotelseite:
+  // https://www.booking.com/hotel/<land>/<name>.html – die steht auf der Buchungsdetailseite.
+  const HOTEL_RE = /(?:https?:\/\/(?:www\.)?booking\.com)?\/hotel\/([a-z]{2})\/([a-z0-9][a-z0-9-]*?)(?:\.[a-z]{2}(?:-[a-z]{2})?)?\.html/i;
+  const PL_TTL = 30 * DAY;
+
+  // Findet den Hotel-Link; bei mehreren (z. B. Empfehlungen) den, der am besten zum Namen passt
+  function hotelUrlFrom(text, title = '') {
+    const src = (text || '').replace(/\\\//g, '/');
+    const found = new Map();
+    for (const m of src.matchAll(new RegExp(HOTEL_RE.source, 'gi'))) {
+      const url = `https://www.booking.com/hotel/${m[1].toLowerCase()}/${m[2].toLowerCase()}.html`;
+      found.set(url, (found.get(url) || 0) + 1);
+    }
+    if (found.size <= 1) return [...found.keys()][0] || '';
+    const words = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+    let best = '', bestScore = -1;
+    for (const [url, count] of found) {
+      const slug = url.split('/').pop();
+      const score = words.filter((w) => slug.includes(w)).length * 100 + count;
+      if (score > bestScore) { best = url; bestScore = score; }
+    }
+    return bestScore >= 100 ? best : '';
+  }
+
+  function locationOf(e) {
+    const parts = stayLine(e).split('·').map((x) => x.trim()).filter(Boolean);
+    return parts.length > 1 ? parts[1] : '';
+  }
+
+  function searchUrl(e) {
+    const q = [e.title, locationOf(e)].filter(Boolean).join(', ');
+    return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(q)}`;
+  }
+
+  // ---------- Gebuchtes Zimmer ----------
+  // Erkennung steckt in room.js (wird auch auf der Detailseite genutzt).
+  const ROOM_JSON_RE = /"(?:room_?name|roomName|room_?type_?name|roomTypeName|unit_?name|unitName)"\s*:\s*"((?:[^"\\]|\\.){3,120})"/gi;
+
+  function roomFrom(html) {
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const room = CancellingRoom.fromTexts(CancellingRoom.textsOf(doc.body || doc.documentElement));
+    if (room) return room;
+    // Fallback: Daten im Seitencode (nur wenn eindeutig – sonst könnten Upgrade-Angebote dabei sein)
+    const found = new Set();
+    for (const m of html.matchAll(ROOM_JSON_RE)) {
+      try { found.add(JSON.parse(`"${m[1]}"`).trim()); } catch { /* egal */ }
+    }
+    return found.size === 1 ? [...found][0] : '';
+  }
+
+  // Zimmer, das quiet.js beim Öffnen der Detailseite gespeichert hat
+  async function storedRoom(e) {
+    const id = CancellingRoom.bookingIdFromUrl(bookingLink(e.card) || '');
+    if (!id) return '';
+    try { return ((await store.get('sfroom:' + id))['sfroom:' + id] || {}).room || ''; } catch { return ''; }
+  }
+
+  // ---------- Details von der Buchungsseite (öffentlicher Link + Zimmer) ----------
+  async function findDetails(e) {
+    let url = '';
+    for (const a of e.card.querySelectorAll('a[href]')) {
+      url = hotelUrlFrom(a.getAttribute('href'), e.title);
+      if (url) break;
+    }
+    try {
+      const v = (await store.get('sfd2:' + e.key))['sfd2:' + e.key];
+      if (v && Date.now() - v.ts < PL_TTL) return { url: url || v.url, room: v.room || (await storedRoom(e)) };
+    } catch { /* egal */ }
+    const detail = bookingLink(e.card);
+    if (!detail) return { url, room: await storedRoom(e) };
+    try {
+      const html = await fetchPage(detail);
+      const res = { url: url || hotelUrlFrom(html, e.title), room: roomFrom(html) };
+      if (res.url || res.room) await store.set({ ['sfd2:' + e.key]: { ...res, ts: Date.now() } });
+      if (!res.room) res.room = await storedRoom(e);
+      return res;
+    } catch (err) { LOG('Details nicht gefunden', e.title, err); return { url, room: await storedRoom(e) }; }
+  }
+
+  // Läuft parallel zur Fristen-Suche (Laden stört das Hovern nicht).
+  // Holt sich jeweils die nächste offene Buchung – auch wenn zwischendurch neu gescannt wird.
+  let linksRunning = false;
+  async function processLinks() {
+    if (linksRunning) return;
+    linksRunning = true;
+    try {
+      for (;;) {
+        const e = [...state.values()].find((x) => !x.detailsTried && x.lastSeen === scanCounter && x.card.isConnected);
+        if (!e) break;
+        e.detailsTried = true;
+        const d = await findDetails(e);
+        e.publicUrl = d.url;
+        e.room = d.room;
+        LOG(e.title, '→', d.url || '(kein Link)', '|', d.room || '(kein Zimmer)');
+        await sleep(400);
+      }
+    } finally {
+      linksRunning = false;
+    }
+  }
+
   // ---------- Liste kopieren ----------
   function stayLine(e) {
-    // Zeile "18. Okt.–19. Okt. · Vila Nova de Gaia · Kostenlose Stornierung" ohne den Storno-Teil
+    // Zeile "18. Okt.–19. Okt. · Vila Nova de Gaia · Kostenlose Stornierung" ohne den Storno-Teil.
+    // Booking zeichnet die "·" teils per CSS – deshalb die Textstücke einzeln einsammeln und selbst verbinden.
     let el = e.marker;
     while (el && el !== e.card && !/\d/.test(el.textContent)) el = el.parentElement;
     if (!el || (el.textContent || '').length > 200) return e.dates || '';
-    return el.textContent
-      .replace(new RegExp('\\s*[·•|,-]?\\s*(' + MARKER_RE.source + ')', 'gi'), '')
-      .replace(/\s+/g, ' ')
-      .replace(/\s*·\s*$/, '')
-      .trim();
+    const parts = [];
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      if (isOurs(n)) continue;
+      for (const piece of n.nodeValue.split(/[·•|]/)) {
+        const t = piece.replace(/\s+/g, ' ').trim();
+        if (t && !MARKER_RE.test(t)) parts.push(t);
+      }
+    }
+    return parts.join(' · ');
+  }
+
+
+  // Tracking-Parameter (label, sid, gclid, aid …) entfernen; nur was die Buchung identifiziert bleibt
+  const KEEP_PARAMS = ['auth_key', 'bn', 'res_id', 'reservation_id', 'pincode', 'pin', 'hotel_id'];
+  function cleanUrl(href) {
+    try {
+      const u = new URL(href, location.href);
+      for (const k of [...u.searchParams.keys()]) if (!KEEP_PARAMS.includes(k.toLowerCase())) u.searchParams.delete(k);
+      u.hash = '';
+      return u.href;
+    } catch { return href; }
   }
 
   function cardLink(card) {
     const detail = bookingLink(card);
-    if (detail) return detail;
+    if (detail) return cleanUrl(detail);
     for (const a of card.querySelectorAll('a[href]')) {
       try {
         const u = new URL(a.href, location.href);
-        if (/(^|\.)booking\.com$/i.test(u.hostname) && !SKIP_RE.test(u.pathname) && !/transport|taxi|car|attraction/i.test(u.pathname)) return u.href;
+        if (/(^|\.)booking\.com$/i.test(u.hostname) && !SKIP_RE.test(u.pathname) && !/transport|taxi|car|attraction/i.test(u.pathname)) return cleanUrl(u.href);
       } catch { /* ignorieren */ }
     }
     return '';
   }
 
-  function buildCopyText() {
+  // forSharing = true: alles wie bei "Liste kopieren", nur ohne den privaten Buchungslink
+  function buildCopyText(forSharing = false) {
     const ts = new Date().toLocaleString(T.locale, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const entries = [...state.values()]
       .filter((e) => e.lastSeen === scanCounter && e.card.isConnected)
       .sort((a, b) => (a.card.compareDocumentPosition(b.card) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-    const lines = [T.copyHead(ts), ''];
+    const lines = [forSharing ? T.copyShareHead(ts) : T.copyHead(ts), ''];
     entries.forEach((e, i) => {
       const d = describe(e.info);
       lines.push(`${i + 1}. ${e.title}`);
       const stay = stayLine(e);
       if (stay) lines.push(`   ${stay}`);
+      if (e.room) lines.push(`   ${T.roomLabel}: ${e.room}`);
       lines.push(`   ${[d.head, d.main].filter(Boolean).join(' ')}${d.sub ? ` (${d.sub})` : ''}`);
       if (e.overlaps && e.overlaps.length) lines.push(`   ! ${T.overlapWith(e.overlaps.join(', '))}`);
-      const link = cardLink(e.card);
-      if (link) lines.push(`   ${link}`);
+      if (e.publicUrl) lines.push(`   ${T.propertyLabel}: ${e.publicUrl}`);
+      else lines.push(`   ${T.searchLabel}: ${searchUrl(e)}`);
+      if (!forSharing) {
+        const link = cardLink(e.card);
+        if (link) lines.push(`   ${T.bookingLabel}: ${link}`);
+      }
       lines.push('');
     });
     return lines.join('\n').trim() + '\n';
@@ -515,18 +656,21 @@
     if (!p) {
       p = document.createElement('div');
       p.className = 'sf-panel';
-      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
+      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-copy-share"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
       p.querySelector('.sf-panel-toggle').addEventListener('click', () => { panelOpen = !panelOpen; p.classList.toggle('sf-open', panelOpen); });
       p.querySelectorAll('.sf-lang button').forEach((b) => b.addEventListener('click', () => {
         chrome.storage.sync.set({ 'sf-settings': { ...settings, language: b.dataset.lang } });
       }));
       p.querySelector('.sf-help').addEventListener('click', () => { chrome.runtime.sendMessage({ type: 'sf-open-help' }).catch(() => {}); });
-      p.querySelector('.sf-copy').addEventListener('click', async (ev) => {
-        const btn = ev.currentTarget;
-        const ok = await copyText(buildCopyText());
-        btn.textContent = ok ? T.copied : T.copyFail;
-        setTimeout(() => { btn.textContent = T.copy; }, 2000);
-      });
+      for (const [sel, share, label] of [['.sf-copy', false, 'copy'], ['.sf-copy-share', true, 'copyShare']]) {
+        p.querySelector(sel).addEventListener('click', async (ev) => {
+          const btn = ev.currentTarget;
+          const ok = await copyText(buildCopyText(share));
+          btn.textContent = ok ? T.copied : T.copyFail;
+          btn.dataset.busy = '1';
+          setTimeout(() => { btn.textContent = T[label]; delete btn.dataset.busy; }, 2000);
+        });
+      }
       p.querySelector('.sf-reload').addEventListener('click', async () => {
         await cacheClear();
         state.forEach((e) => e.badge && e.badge.remove());
@@ -546,8 +690,10 @@
     hb.title = T.help;
     hb.setAttribute('aria-label', T.help);
     p.querySelector('.sf-reload').textContent = T.reload;
-    const cb = p.querySelector('.sf-copy');
-    if (cb.textContent !== T.copied && cb.textContent !== T.copyFail) cb.textContent = T.copy;
+    for (const [sel, label] of [['.sf-copy', 'copy'], ['.sf-copy-share', 'copyShare']]) {
+      const b = p.querySelector(sel);
+      if (!b.dataset.busy) b.textContent = T[label];
+    }
     const ul = p.querySelector('ul');
     ul.textContent = '';
     for (const { e, d } of rows) {
@@ -602,6 +748,7 @@
     }
     running = false;
     if (done) setTimeout(scan, 300); // nachgeladene Buchungen erfassen
+    processLinks();
   }
 
   function scan() {
@@ -651,6 +798,7 @@
     if (count) LOG(`${count} Buchung(en) gefunden`);
     renderPanel(id);
     processQueue();
+    processLinks();
   }
 
   // Booking (React) zeichnet Teile der Seite neu und wirft dabei fremde Elemente raus.
@@ -674,6 +822,18 @@
       if (!e.card.isConnected || !e.badge || !e.badge.isConnected) { schedule(0); return; }
     }
   }, 1500);
+
+  // Zimmer wurde auf einer Detailseite (anderer Tab) gespeichert → hier übernehmen
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    for (const [k, ch] of Object.entries(changes)) {
+      if (!k.startsWith('sfroom:') || !ch.newValue) continue;
+      const id = k.slice(7);
+      for (const e of state.values()) {
+        if (CancellingRoom.bookingIdFromUrl(bookingLink(e.card) || '') === id) e.room = ch.newValue.room;
+      }
+    }
+  });
 
   // Sprache umgestellt (über das Extension-Symbol) → sofort neu anzeigen
   chrome.storage.onChanged.addListener((changes, area) => {

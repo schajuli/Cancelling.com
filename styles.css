@@ -113,7 +113,7 @@
 .sf-panel .sf-panel-head .sf-help:hover { background: #006ce4 !important; color: #fff !important; }
 .sf-panel-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ececec; font-size: 12px; color: #6b6b6b; }
 .sf-foot-text { flex: 1 1 100%; }
-.sf-actions { display: flex; gap: 6px; width: 100%; }
+.sf-actions { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
 .sf-actions button { padding: 5px 10px; border: 1px solid #c7c7c7; border-radius: 6px; background: #fff; color: #1a1a1a; }
 .sf-actions .sf-copy { background: #006ce4; border-color: #006ce4; color: #fff; font-weight: 600; }
 

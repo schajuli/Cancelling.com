@@ -1,4 +1,6 @@
-// Schließt auf Booking-Buchungsseiten nur das Werbe-Fenster
+// Auf Booking-Buchungsdetailseiten:
+// 1. merkt sich das gebuchte Zimmer (für die Listen in der Übersicht)
+// 2. schließt nur das Werbe-Fenster
 // "Vergessen Sie nicht, Ihre Prämien zu nutzen" (Flughafentransfer, Auto, Aktivitäten …).
 // Alle anderen Fenster – z. B. Storno-Bestätigungen – werden nicht angefasst.
 (() => {
@@ -55,6 +57,26 @@
     if (timer) return;
     timer = setTimeout(() => { timer = null; check(); }, 150);
   }).observe(document.body, { childList: true, subtree: true });
+
+  // ---------- Gebuchtes Zimmer merken ----------
+  // Booking baut "Ihre Zimmerinformationen" teils erst im Browser auf. Wenn du die Detailseite
+  // öffnest, merkt sich die Erweiterung das Zimmer für die Listen auf der Buchungsübersicht.
+  const roomId = globalThis.CancellingRoom ? CancellingRoom.bookingIdFromUrl(location.href) : '';
+  let roomSaved = '';
+  function captureRoom() {
+    if (!roomId) return;
+    const room = CancellingRoom.fromTexts(CancellingRoom.textsOf(document.body));
+    if (!room || room === roomSaved) return;
+    roomSaved = room;
+    chrome.storage.local.set({ ['sfroom:' + roomId]: { room, ts: Date.now() } })
+      .then(() => console.log('[Cancelling] Zimmer gemerkt:', room))
+      .catch(() => {});
+  }
+  let roomTries = 0;
+  const roomTimer = setInterval(() => {
+    captureRoom();
+    if (++roomTries > 20 || roomSaved) clearInterval(roomTimer); // max. ~30 s
+  }, 1500);
 
   chrome.storage.sync.get(KEY).then((r) => {
     enabled = ((r[KEY] || {}).hidePromos) !== false; // Standard: an
