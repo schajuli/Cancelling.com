@@ -1,0 +1,1 @@
+@call "C:\Users\j.schachner\git\scripts-snippets-tools\GitAutoUpdate_2.0.bat"

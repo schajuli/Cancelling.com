@@ -67,7 +67,9 @@
 .sf-panel ul { list-style: none; margin: 0; padding: 0; }
 .sf-panel li { padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; border-left: 4px solid currentColor; cursor: pointer; }
 .sf-panel li strong { display: block; color: #1d2939; font-weight: 600; }
-.sf-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; color: #667085; font-size: 12px; }
+.sf-panel-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; color: #667085; font-size: 12px; }
+.sf-actions { display: flex; gap: 6px; margin-left: auto; }
+.sf-panel-foot .sf-copy { background: #003b95; border-color: #003b95; color: #fff; font-weight: 600; }
 .sf-panel-foot button { border: 1px solid #d0d5dd; background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; cursor: pointer; }
 
 /* ---------- Drucken ---------- */

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Cancelling",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Booking.com hides your free-cancellation deadlines behind tooltips. This extension puts them next to the price.",
   "permissions": [
     "storage"
@@ -34,5 +34,9 @@
       "id": "cancelling@local",
       "strict_min_version": "121.0"
     }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Cancelling"
   }
 }

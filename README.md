@@ -11,7 +11,22 @@ In your Booking.com reservation list, every booking gets a small label next to i
 | Red    | Deadline has passed, or the booking is non-refundable |
 | Grey   | Deadline could not be found |
 
-A button in the bottom-right corner opens a list of all bookings sorted by deadline. The labels are included when you print the page (Ctrl+P).
+A button in the bottom-right corner opens a list of all bookings sorted by deadline. From there, **Copy list** puts all bookings on your clipboard as plain text, ready to paste into a chat or note:
+
+```
+My bookings – copied on Fri, 09/10/2026, 16:39
+
+1. Refúgio da Suite 5
+   19 Oct–20 Oct · Pinhão
+   Free cancellation until Thu, 15/10/2026 (6 days left)
+   https://secure.booking.com/...
+```
+
+The labels are included when you print the page (Ctrl+P).
+
+## Settings
+
+Click the Cancelling icon in the browser toolbar to choose the language: automatic (matches the Booking.com page), German or English. The change applies immediately.
 
 ## How it works
 

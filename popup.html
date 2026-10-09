@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 14px 16px; width: 220px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1d2939; }
+  h1 { margin: 0 0 10px; font-size: 15px; }
+  fieldset { margin: 0; padding: 0; border: 0; }
+  legend { padding: 0; margin-bottom: 6px; color: #667085; }
+  label { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+  input:focus-visible { outline: 2px solid #003b95; outline-offset: 2px; }
+  .saved { min-height: 1.4em; margin-top: 8px; color: #067647; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Cancelling</h1>
+  <fieldset>
+    <legend id="legend">Sprache / Language</legend>
+    <label><input type="radio" name="language" value="auto"> <span id="auto">Automatisch</span></label>
+    <label><input type="radio" name="language" value="de"> Deutsch</label>
+    <label><input type="radio" name="language" value="en"> English</label>
+  </fieldset>
+  <div class="saved" id="saved" role="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
