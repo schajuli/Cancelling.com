@@ -19,7 +19,7 @@ Overlaps are checked per night: 1–4 and 3–5 overlap, 1–4 and 4–6 (check-
 
 ## Panel and copy list
 
-The blue **Cancelling · X bookings** button in the bottom-right corner opens a list of all bookings sorted by deadline. The panel also has a **DE / EN** language switch, a **?** that opens the help page, **Reload** to look up all deadlines again, and two copy buttons. **Copy list** puts all bookings on your clipboard as plain text, ready to paste into a chat or note:
+The blue **Cancelling · X bookings** button in the bottom-right corner opens a list of all bookings sorted by deadline. The panel also has a **DE / EN** language switch, a **?** that opens the help page, **Reload** to look up all deadlines again, and three copy buttons. **Copy list** puts all bookings on your clipboard as plain text, ready to paste into a chat or note:
 
 ```
 My bookings – copied on Fri, 09/10/2026, 16:39
@@ -73,6 +73,19 @@ Both lists also include each booking's price as shown in the reservation list, p
 While data is still loading in the background, the panel button shows a spinner and "loading 12/29", and the panel shows how many deadlines, rooms and links are ready. Lists copied before that include a note that they are incomplete.
 
 "X days left" refers to the time in the first line. The labels are also included when you print the page (Ctrl+P / ⌘+P); the panel is hidden when printing.
+
+### Atlas Share
+
+**Atlas Share** copies the same list as *Copy for sharing* plus two extra lines per property for the Atlas importer:
+
+```
+   Rating: 8.9 · Fabulous · 1,234 reviews
+   Photos: https://cf.bstatic.com/xdata/images/hotel/max1024x768/…jpg, …
+```
+
+Rating and photos come from the property's public Booking.com page: the rating from the page data (Booking's 1–10 scale) plus the word from the score box, and the first 5 photos of the property's own gallery, starting with the main image (`og:image`). Photos of recommended other properties further down the page are not used. Without a rating word, only the number is exported.
+
+Because this means loading one more page per booking, it only starts the first time you click **Atlas Share** and then runs automatically in the background. Results are cached for 7 days. The first click may copy an incomplete list (marked with a note); copy again once the panel shows "Ratings & photos 29/29".
 
 ## Settings and help
 

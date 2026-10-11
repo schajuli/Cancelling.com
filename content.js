@@ -295,6 +295,13 @@
       overlapWith: (names) => `Überschneidung mit: ${names}`,
       copy: 'Liste kopieren',
       copyShare: 'Zum Teilen kopieren',
+      atlas: 'Atlas Share',
+      atlasLoading: (a, n) => `Atlas: lädt ${a}/${n} …`,
+      atlasProgress: (a, n) => ` · Bewertungen & Fotos ${a}/${n}`,
+      atlasIncomplete: (a, n) => `(Hinweis: Bewertungen & Fotos erst für ${a} von ${n} Buchungen geladen – gleich nochmal kopieren)`,
+      ratingLabel: 'Bewertung',
+      reviews: 'Bewertungen',
+      photosLabel: 'Fotos',
       copyShareHead: (ts) => `Unsere Unterkünfte – Stand ${ts}`,
       propertyLabel: 'Unterkunft',
       roomLabel: 'Zimmer',
@@ -331,6 +338,13 @@
       overlapWith: (names) => `Overlaps with: ${names}`,
       copy: 'Copy list',
       copyShare: 'Copy for sharing',
+      atlas: 'Atlas Share',
+      atlasLoading: (a, n) => `Atlas: loading ${a}/${n} …`,
+      atlasProgress: (a, n) => ` · Ratings & photos ${a}/${n}`,
+      atlasIncomplete: (a, n) => `(Note: ratings & photos loaded for only ${a} of ${n} bookings – copy again in a moment)`,
+      ratingLabel: 'Rating',
+      reviews: 'reviews',
+      photosLabel: 'Photos',
       copyShareHead: (ts) => `Our places to stay – as of ${ts}`,
       propertyLabel: 'Property',
       roomLabel: 'Room',
@@ -573,11 +587,123 @@
         e.detailsDone = true;
         LOG(e.title, '→', d.url || '(kein Link)', '|', d.room || '(kein Zimmer)');
         renderPanel(scanCounter);
+        processAtlas();
         await sleep(400);
       }
     } finally {
       linksRunning = false;
     }
+  }
+
+  // ---------- Atlas: Bewertung + Fotos von der öffentlichen Hotelseite ----------
+  // Wird erst geladen, wenn "Atlas Share" einmal benutzt wurde (danach automatisch).
+  const ATLAS_TTL = 7 * DAY;
+  const ATLAS_PHOTOS = 5;
+  const RATING_WORDS = ['Außergewöhnlich', 'Hervorragend', 'Fabelhaft', 'Sehr gut', 'Gut', 'Angenehm', 'Ausreichend',
+    'Exceptional', 'Superb', 'Wonderful', 'Fabulous', 'Very good', 'Good', 'Pleasant', 'Passable'];
+  let atlasEnabled = false;
+
+  const decodeHtml = (s) => s.replace(/&amp;/g, '&').replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+
+  // Hauptfotos der Unterkunft: zuerst og:image (Titelbild), dann die Galerie in Seitenreihenfolge.
+  // Empfehlungen anderer Hotels stehen weiter unten auf der Seite und kommen so nicht in die ersten 5.
+  function photosFrom(html) {
+    const src = decodeHtml(html);
+    const best = new Map(); // Foto-ID → größte Version
+    const order = [];
+    const size = (u) => {
+      const m = u.match(/\/(?:max|square)(\d+)(?:x(\d+))?\//i);
+      return m ? +m[1] * (+m[2] || +m[1]) : 0;
+    };
+    const add = (u) => {
+      const m = u.match(/\/xdata\/images\/hotel\/[^/]+\/(\d+)\.(?:jpe?g|webp|png)/i);
+      if (!m) return;
+      if (!best.has(m[1])) { order.push(m[1]); best.set(m[1], u); }
+      else if (size(u) > size(best.get(m[1]))) best.set(m[1], u);
+    };
+    const og = src.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+      || src.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    if (og) add(og[1]);
+    const re = /https?:\/\/[a-z0-9.-]*bstatic\.com\/xdata\/images\/hotel\/[a-z0-9_]+\/\d+\.(?:jpe?g|webp|png)(?:\?[^"'\s<>)\\]*)?/gi;
+    for (const m of src.matchAll(re)) add(m[0]);
+    // nur die ersten Fotos in Seitenreihenfolge, jeweils in der größten gefundenen Version
+    return order.slice(0, ATLAS_PHOTOS).map((id) => best.get(id));
+  }
+
+  function ratingFrom(html) {
+    const src = decodeHtml(html);
+    let value = null;
+    let count = null;
+    const ar = src.match(/"aggregateRating"\s*:\s*\{([^}]*)\}/i);
+    if (ar) {
+      const v = ar[1].match(/"ratingValue"\s*:\s*"?([\d.,]+)/i);
+      const c = ar[1].match(/"(?:reviewCount|ratingCount)"\s*:\s*"?([\d.,]+)/i);
+      const b = ar[1].match(/"bestRating"\s*:\s*"?([\d.,]+)/i);
+      if (v) value = parseFloat(v[1].replace(',', '.'));
+      if (b && parseFloat(b[1]) !== 10) value = null; // nur Booking-Skala 1–10
+      if (c) count = parseInt(c[1].replace(/[.,]/g, ''), 10);
+    }
+    if (value == null) return null;
+    // Bewertungswort (Fabelhaft …) steht im Score-Kästchen direkt nach der Zahl
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,style,noscript,template').forEach((n) => n.remove());
+    const text = (doc.body ? doc.body.textContent : '').replace(/\s+/g, ' ');
+    const num = value.toFixed(1);
+    const nums = `(?:${num.replace('.', '[.,]')})`;
+    const words = RATING_WORDS.map((w) => w.replace(/ /g, '\\s+')).join('|');
+    const m = text.match(new RegExp(`${nums}\\D{0,40}?\\b(${words})\\b`, 'i'));
+    const word = m ? RATING_WORDS.find((w) => w.toLowerCase() === m[1].replace(/\s+/g, ' ').toLowerCase()) : '';
+    return { value, count, word };
+  }
+
+  function hotelPageUrl(url) {
+    return url.replace(/\.html$/, currentLang === 'de' ? '.de.html' : '.en-gb.html');
+  }
+
+  async function findAtlas(e) {
+    const key = 'sfa:' + e.publicUrl;
+    try {
+      const v = (await store.get(key))[key];
+      if (v && Date.now() - v.ts < ATLAS_TTL) return v;
+    } catch { /* egal */ }
+    try {
+      const html = await fetchPage(hotelPageUrl(e.publicUrl));
+      const res = { rating: ratingFrom(html), photos: photosFrom(html), ts: Date.now() };
+      if (res.rating || res.photos.length) await store.set({ [key]: res });
+      return res;
+    } catch (err) { LOG('Hotelseite nicht geladen', e.title, err); return { rating: null, photos: [] }; }
+  }
+
+  let atlasRunning = false;
+  async function processAtlas() {
+    if (!atlasEnabled || atlasRunning) return;
+    atlasRunning = true;
+    try {
+      for (;;) {
+        // erst wenn der öffentliche Link bekannt ist (kommt aus processLinks)
+        const e = [...state.values()].find((x) => !x.atlasDone && x.detailsDone && x.lastSeen === scanCounter && x.card.isConnected);
+        if (!e) break;
+        if (e.publicUrl) {
+          const a = await findAtlas(e);
+          e.rating = a.rating;
+          e.photos = a.photos || [];
+          LOG(e.title, '→ Atlas:', a.rating ? a.rating.value : '(keine Bewertung)', '|', e.photos.length, 'Fotos');
+          await sleep(500);
+        }
+        e.atlasDone = true;
+        renderPanel(scanCounter);
+      }
+    } finally {
+      atlasRunning = false;
+    }
+  }
+
+  function ratingLine(r) {
+    if (!r) return '';
+    const num = r.value.toLocaleString(T.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    // Ohne Bewertungswort nur die Zahl – Atlas ergänzt das Wort selbst
+    if (!r.word) return num;
+    return [num, r.word, r.count ? `${r.count.toLocaleString(currentLang === 'de' ? 'de-DE' : 'en-GB')} ${T.reviews}` : ''].filter(Boolean).join(' · ');
   }
 
   // ---------- Fortschritt ----------
@@ -587,7 +713,8 @@
     const deadlines = list.filter((e) => e.info.status !== 'loading').length;
     const details = list.filter((e) => e.detailsDone).length;
     const rooms = list.filter((e) => e.room).length;
-    return { n, deadlines, details, rooms, busy: deadlines < n || details < n };
+    const atlas = list.filter((e) => e.atlasDone).length;
+    return { n, deadlines, details, rooms, atlas, busy: deadlines < n || details < n || (atlasEnabled && atlas < n) };
   }
 
   // "€ 1.234,56" / "US$1,234.56" → { amount, currency }
@@ -661,7 +788,8 @@
   }
 
   // forSharing = true: alles wie bei "Liste kopieren", nur ohne den privaten Buchungslink
-  function buildCopyText(forSharing = false) {
+  // atlas = true: wie "Teilen", zusätzlich Bewertung und Fotos (für den Atlas-Import)
+  function buildCopyText(forSharing = false, atlas = false) {
     const ts = new Date().toLocaleString(T.locale, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const entries = [...state.values()]
       .filter((e) => e.lastSeen === scanCounter && e.card.isConnected)
@@ -669,6 +797,7 @@
     const lines = [forSharing ? T.copyShareHead(ts) : T.copyHead(ts)];
     const pr = progress();
     if (pr.details < pr.n) lines.push(T.incomplete(pr.details, pr.n));
+    if (atlas && pr.atlas < pr.n) lines.push(T.atlasIncomplete(pr.atlas, pr.n));
     lines.push('');
     entries.forEach((e, i) => {
       const d = describe(e.info);
@@ -677,6 +806,11 @@
       if (stay) lines.push(`   ${stay}`);
       if (e.room) lines.push(`   ${T.roomLabel}: ${e.room}`);
       if (e.price) lines.push(`   ${T.priceLabel}: ${e.price}`);
+      if (atlas) {
+        const r = ratingLine(e.rating);
+        if (r) lines.push(`   ${T.ratingLabel}: ${r}`);
+        if (e.photos && e.photos.length) lines.push(`   ${T.photosLabel}: ${e.photos.join(', ')}`);
+      }
       lines.push(`   ${[d.head, d.main].filter(Boolean).join(' ')}${d.sub ? ` (${d.sub})` : ''}`);
       if (e.overlaps && e.overlaps.length) lines.push(`   ! ${T.overlapWith(e.overlaps.join(', '))}`);
       if (e.publicUrl) lines.push(`   ${T.propertyLabel}: ${e.publicUrl}`);
@@ -714,7 +848,7 @@
     if (!p) {
       p = document.createElement('div');
       p.className = 'sf-panel';
-      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><div class="sf-progress" role="status"><span class="sf-progress-text"></span><span class="sf-bar"><span></span></span></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-copy-share"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
+      p.innerHTML = '<div class="sf-panel-body"><div class="sf-panel-head"><strong>Cancelling</strong><span class="sf-lang" role="group" aria-label="Sprache / Language"><button type="button" data-lang="de">DE</button><button type="button" data-lang="en">EN</button></span><button type="button" class="sf-help">?</button></div><div class="sf-progress" role="status"><span class="sf-progress-text"></span><span class="sf-bar"><span></span></span></div><ul></ul><div class="sf-panel-foot"><span class="sf-foot-text"></span><span class="sf-actions"><button type="button" class="sf-copy"></button><button type="button" class="sf-copy-share"></button><button type="button" class="sf-atlas"></button><button type="button" class="sf-reload"></button></span></div></div><button type="button" class="sf-panel-toggle"></button>';
       p.querySelector('.sf-panel-toggle').addEventListener('click', () => { panelOpen = !panelOpen; p.classList.toggle('sf-open', panelOpen); });
       p.querySelectorAll('.sf-lang button').forEach((b) => b.addEventListener('click', () => {
         chrome.storage.sync.set({ 'sf-settings': { ...settings, language: b.dataset.lang } });
@@ -729,6 +863,19 @@
           setTimeout(() => { btn.textContent = T[label]; delete btn.dataset.busy; }, 2000);
         });
       }
+      p.querySelector('.sf-atlas').addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        if (!atlasEnabled) {
+          // ab jetzt Bewertungen & Fotos immer mitladen
+          atlasEnabled = true;
+          store.set({ 'sf-atlas-used': true }).catch(() => {});
+          processAtlas();
+        }
+        const ok = await copyText(buildCopyText(true, true));
+        btn.textContent = ok ? T.copied : T.copyFail;
+        btn.dataset.busy = '1';
+        setTimeout(() => { delete btn.dataset.busy; renderPanel(scanCounter); }, 2000);
+      });
       p.querySelector('.sf-reload').addEventListener('click', async () => {
         await cacheClear();
         state.forEach((e) => e.badge && e.badge.remove());
@@ -742,13 +889,14 @@
       .sort((a, b) => a.d.rank - b.d.rank || (a.d.sortDate || 0) - (b.d.sortDate || 0));
     const urgent = rows.filter((r) => r.d.cls === 'sf-soon').length;
     const pr = progress();
-    const doneSteps = pr.deadlines + pr.details;
+    const steps = atlasEnabled ? 3 : 2;
+    const doneSteps = pr.deadlines + pr.details + (atlasEnabled ? pr.atlas : 0);
     p.querySelector('.sf-panel-toggle').textContent = T.panel(entries.length)
-      + (pr.busy ? ` · ${T.loadingShort(Math.round(doneSteps / 2), pr.n)}` : '')
+      + (pr.busy ? ` · ${T.loadingShort(Math.round(doneSteps / steps), pr.n)}` : '')
       + (urgent ? ` · ${T.soon(urgent)}` : '');
     p.classList.toggle('sf-busy', pr.busy);
-    p.querySelector('.sf-progress-text').textContent = `${pr.busy ? T.stillLoading : T.allLoaded} – ${T.progress(pr.deadlines, pr.details, pr.n, pr.rooms)}`;
-    p.querySelector('.sf-bar > span').style.width = `${pr.n ? Math.round((doneSteps / (2 * pr.n)) * 100) : 0}%`;
+    p.querySelector('.sf-progress-text').textContent = `${pr.busy ? T.stillLoading : T.allLoaded} – ${T.progress(pr.deadlines, pr.details, pr.n, pr.rooms)}${atlasEnabled ? T.atlasProgress(pr.atlas, pr.n) : ''}`;
+    p.querySelector('.sf-bar > span').style.width = `${pr.n ? Math.round((doneSteps / (steps * pr.n)) * 100) : 0}%`;
     p.querySelector('.sf-foot-text').textContent = T.foot;
     p.querySelectorAll('.sf-lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === currentLang)));
     const hb = p.querySelector('.sf-help');
@@ -759,6 +907,8 @@
       const b = p.querySelector(sel);
       if (!b.dataset.busy) b.textContent = T[label];
     }
+    const ab = p.querySelector('.sf-atlas');
+    if (!ab.dataset.busy) ab.textContent = atlasEnabled && pr.atlas < pr.n ? T.atlasLoading(pr.atlas, pr.n) : T.atlas;
     const ul = p.querySelector('ul');
     ul.textContent = '';
     for (const { e, d } of rows) {
@@ -865,6 +1015,7 @@
     renderPanel(id);
     processQueue();
     processLinks();
+    processAtlas();
   }
 
   // Booking (React) zeichnet Teile der Seite neu und wirft dabei fremde Elemente raus.
@@ -910,5 +1061,7 @@
     renderPanel(scanCounter);
   });
 
-  loadSettings().then(scan);
+  loadSettings()
+    .then(() => store.get('sf-atlas-used').then((r) => { atlasEnabled = !!r['sf-atlas-used']; }).catch(() => {}))
+    .then(scan);
 })();
